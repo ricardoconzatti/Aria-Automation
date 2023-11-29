@@ -1,0 +1,24 @@
+/* REQUIREMENTS
+- an input named 'environment' of type string
+- a tag named network-name:[network-name] associated with the fabric network (eg: network-name:app-pg)
+- a tag named environment:[env] associated with the fabric network (eg: environment:prod)
+*/
+var host = VraHostManager.defaultHostData;
+var allnetworks = VraEntitiesFinder.getFabricNetworks(host);
+//System.log(allnetworks);
+var networks = [];
+var networktags = [];
+var tagprefix = "environment" // tag prefix tag based (environment:dev / environment:prod)
+
+for (var inetwork = 0; inetwork < allnetworks.length; inetwork++) { // network looping
+    if (allnetworks[inetwork].tags != null) { // conditional based on existing tags
+        networktags = allnetworks[inetwork].tags;
+        for (var itags = 0; itags < networktags.length; itags++) { // tags looping
+            if (networktags[itags].value == environment && networktags[itags].key == tagprefix) {
+                networks.push(allnetworks[inetwork].name.toLowerCase());
+                //System.log(allnetworks[inetwork].name.toLowerCase());
+            }
+		}
+	}
+}
+return networks.sort();
