@@ -1,0 +1,129 @@
+name: Linux with Ansible
+version: 1
+inputs:
+  environment:
+    type: string
+    title: Environment
+    description: Select the environment
+    oneOf:
+      - title: Production
+        const: prod
+      - title: Development
+        const: dev
+  service:
+    type: string
+    title: Service
+    description: Select the server type
+    oneOf:
+      - title: Application
+        const: app
+      - title: Database
+        const: db
+      - title: Web Server
+        const: web
+  instances:
+    type: number
+    title: Instances
+    description: Enter the number of instances
+    default: 2
+    minimum: 1
+    maximum: 10
+  image:
+    type: string
+    title: Operation System
+    description: Select the operating system version
+    oneOf:
+      - title: Ubuntu 22.04
+        const: Ubuntu 22.04
+      - title: Rocky 9.1
+        const: Rocky 9.1
+      - title: OpenSUSE 15.4
+        const: OpenSUSE 15.4
+  size:
+    type: string
+    title: Instance size
+    description: Select the instance size
+    oneOf:
+      - title: Small (1 CPU / 1GB RAM)
+        const: Small
+      - title: Medium (1 CPU / 2GB RAM)
+        const: Medium
+      - title: Large (2 CPU / 4GB RAM)
+        const: Large
+  additionaldisks:
+    type: array
+    title: Additional disks
+    description: Up to 5 additional disks per instance
+    minItems: 0
+    maxItems: 5
+    items:
+      type: object
+      properties:
+        size:
+          type: integer
+          title: Disk size (GB)
+          minimum: 1
+          maximum: 1000
+        SCSIController:
+          type: string
+          title: SCSI Controller
+          enum:
+            - SCSI_Controller_0
+            - SCSI_Controller_1
+            - SCSI_Controller_2
+            - SCSI_Controller_3
+#---------------------------------------------------#
+resources:
+  vm:
+    type: Cloud.vSphere.Machine
+    allocatePerInstance: true
+    properties:
+      count: ${input.instances}
+      name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-" + to_upper(input.service) + "-"}'
+      image: ${input.image}
+      flavor: ${input.size}
+      projectName: ${env.projectName}
+      blueprintName: ${env.blueprintName}
+      deploymentName: ${env.deploymentName}
+      service: ${(input.service)}
+      environment: ${(input.environment)}
+      constraints: # cluster
+        - tag: ${'environment:' + (input.environment)}
+        - tag: ${'service:' + (input.service)}
+      networks:
+        - network: ${resource.network.id}
+          assignment: static
+      attachedDisks: ${map_to_object(slice(resource.disk[*].id, length(input.additionaldisks)*count.index, length(input.additionaldisks)*(count.index+1)), "source")}
+  #---------------------------------------------------#
+  network:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      constraints: # network
+        - tag: ${'environment:' + (input.environment)}
+        - tag: ${'service:' + (input.service)}
+  #---------------------------------------------------#
+  disk:
+    type: Cloud.vSphere.Disk
+    allocatePerInstance: true
+    properties:
+      capacityGb: '${(count.index < length(input.additionaldisks) ? input.additionaldisks[count.index].size : input.additionaldisks[(count.index % length(input.additionaldisks))].size)}'
+      SCSIController: '${(count.index < length(input.additionaldisks) ? input.additionaldisks[count.index].SCSIController : input.additionaldisks[(count.index % length(input.additionaldisks))].SCSIController)}'
+      count: ${length(input.additionaldisks) * input.instances}
+  #---------------------------------------------------#
+  ansible:
+    type: Cloud.Ansible
+    properties:
+      account: Caverna Ansible
+      osType: linux
+      host: ${resource.vm.[*]}
+      username: conza
+      password: secret
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/test-var.yml
+      hostVariables:
+        vmname: ${resource.vm[*].resourceName}
+        ip: ${resource.vm[*].address}
+        env: ${input.environment}
+        service: ${input.service}
