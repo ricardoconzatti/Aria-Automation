@@ -1,0 +1,135 @@
+name: Linux Multi Machine with NSX LB
+version: 1
+inputs:
+  environment:
+    type: string
+    title: Environment
+    description: Select the environment
+    oneOf:
+      - title: Production
+        const: prod
+      - title: Development
+        const: dev
+  instancesapp:
+    type: number
+    title: Application instances
+    description: Enter the number of application instances
+    default: 2
+    minimum: 2
+    maximum: 10
+  sizeapp:
+    type: string
+    title: Instance size
+    description: Select the application instance size
+    oneOf:
+      - title: Small (1 CPU / 1GB RAM)
+        const: Small
+      - title: Medium (1 CPU / 2GB RAM)
+        const: Medium
+      - title: Large (2 CPU / 4GB RAM)
+        const: Large
+  instancesdb:
+    type: number
+    title: Database instances
+    description: Enter the number of database instances
+    default: 2
+    minimum: 2
+    maximum: 10
+  sizedb:
+    type: string
+    title: Instance size
+    description: Select the database instance size
+    oneOf:
+      - title: Small (1 CPU / 1GB RAM)
+        const: Small
+      - title: Medium (1 CPU / 2GB RAM)
+        const: Medium
+      - title: Large (2 CPU / 4GB RAM)
+        const: Large
+#---------------------------------------------------#
+resources:
+  vm-app:
+    type: Cloud.vSphere.Machine
+    properties:
+      count: ${input.instancesapp}
+      name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-APP-"}'
+      image: Ubuntu 22.04
+      flavor: ${input.sizeapp}
+      projectName: ${env.projectName}
+      blueprintName: ${env.blueprintName}
+      deploymentName: ${env.deploymentName}
+      service: app
+      environment: ${(input.environment)}
+      constraints:
+        - tag: ${'environment:' + (input.environment)}
+        - tag: service:app
+      networks:
+        - network: ${resource.network-app.id}
+          assignment: static
+  #---------------------------------------------------#
+  network-app:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.environment)}
+        - tag: service:app
+        - tag: network:nsx
+  #---------------------------------------------------#
+  nsx-lb-app:
+    type: Cloud.NSX.LoadBalancer
+    properties:
+      name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-APP-LB-"}'
+      instances: ${resource.vm-app[*].id}
+      network: ${resource.network-app.id}
+      routes:
+        - protocol: TCP
+          port: 8080
+          instanceProtocol: TCP
+          instancePort: 8080
+          algorithm: ROUND_ROBIN
+      constraints:
+        - tag: nsx:lb-01
+  #---------------------------------------------------#
+  vm-db:
+    type: Cloud.vSphere.Machine
+    properties:
+      count: ${input.instancesapp}
+      name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-DB-"}'
+      image: Ubuntu 22.04
+      flavor: ${input.sizedb}
+      projectName: ${env.projectName}
+      blueprintName: ${env.blueprintName}
+      deploymentName: ${env.deploymentName}
+      service: db
+      environment: ${(input.environment)}
+      constraints:
+        - tag: ${'environment:' + (input.environment)}
+        - tag: service:db
+      networks:
+        - network: ${resource.network-app.id}
+          assignment: static
+  #---------------------------------------------------#
+  network-db:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.environment)}
+        - tag: service:db
+        - tag: network:nsx
+  #---------------------------------------------------#
+  nsx-lb-db:
+    type: Cloud.NSX.LoadBalancer
+    properties:
+      name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-DB-LB-"}'
+      instances: ${resource.vm-db[*].id}
+      network: ${resource.network-db.id}
+      routes:
+        - protocol: TCP
+          port: 3306
+          instanceProtocol: TCP
+          instancePort: 3306
+          algorithm: LEAST_CONNECTION
+      constraints:
+        - tag: nsx:lb-01
