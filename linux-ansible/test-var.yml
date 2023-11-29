@@ -1,0 +1,14 @@
+# ansible example playbook
+- name: Test Var
+  hosts: all
+  connection: ssh
+  become: no
+  tasks:
+    - name: "VM Name"
+      shell: echo "{{ vmname }}" >> ~/test_var.txt
+    - name: "IP Address"
+      shell: echo "{{ ip }}" >> ~/test_var.txt
+    - name: "Environment"
+      shell: echo "{{ env }}" >> ~/test_var.txt
+    - name: "Service"
+      shell: echo "{{ service }}" >> ~/test_var.txt
