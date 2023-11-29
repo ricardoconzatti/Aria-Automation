@@ -1,1 +1,1 @@
-# Aria Automation | vRA | Template | Blueprint
+# Blueprint examples | Aria Automation - vRA
