@@ -64,7 +64,7 @@ resources:
         - tag: ${'environment:' + (input.environment)}
         - tag: service:app
       networks:
-        - network: ${resource.network-app.id}
+        - network: ${resource["network-app"].id}
           assignment: static
   #---------------------------------------------------#
   network-app:
@@ -74,14 +74,14 @@ resources:
       constraints:
         - tag: ${'environment:' + (input.environment)}
         - tag: service:app
-        - tag: network:nsx
+        - tag: rede:nsx
   #---------------------------------------------------#
   nsx-lb-app:
     type: Cloud.NSX.LoadBalancer
     properties:
       name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-APP-LB-"}'
-      instances: ${resource.vm-app[*].id}
-      network: ${resource.network-app.id}
+      instances: ${resource["vm-app"][*].id}
+      network: ${resource["network-app"].id}
       routes:
         - protocol: TCP
           port: 8080
@@ -107,7 +107,7 @@ resources:
         - tag: ${'environment:' + (input.environment)}
         - tag: service:db
       networks:
-        - network: ${resource.network-app.id}
+        - network: ${resource["network-db"].id}
           assignment: static
   #---------------------------------------------------#
   network-db:
@@ -117,14 +117,14 @@ resources:
       constraints:
         - tag: ${'environment:' + (input.environment)}
         - tag: service:db
-        - tag: network:nsx
+        - tag: rede:nsx
   #---------------------------------------------------#
   nsx-lb-db:
     type: Cloud.NSX.LoadBalancer
     properties:
       name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-DB-LB-"}'
-      instances: ${resource.vm-db[*].id}
-      network: ${resource.network-db.id}
+      instances: ${resource["vm-db"][*].id}
+      network: ${resource["network-db"].id}
       routes:
         - protocol: TCP
           port: 3306
