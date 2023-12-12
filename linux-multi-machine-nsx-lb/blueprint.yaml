@@ -50,6 +50,7 @@ inputs:
 resources:
   vm-app:
     type: Cloud.vSphere.Machine
+    allocatePerInstance: true
     properties:
       count: ${input.instancesapp}
       name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-APP-"}'
@@ -93,6 +94,7 @@ resources:
   #---------------------------------------------------#
   vm-db:
     type: Cloud.vSphere.Machine
+    allocatePerInstance: true
     properties:
       count: ${input.instancesapp}
       name: '${"CAV-" + (input.environment == "prod" ? "P" : "D") + "-DB-"}'
