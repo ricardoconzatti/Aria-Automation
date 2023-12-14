@@ -15,7 +15,7 @@ provider "vra" {
 }
 
 ##### DATA #####
-data "vra_project" "this" {
+  data "vra_project" "this" {
   name = var.project_name
 }
 
@@ -35,33 +35,33 @@ resource "vra_deployment" "this" {
   
   inputs = {
     # all virtual machines
-	vm_environment   = var.vm_environment
+    vm_environment   = var.vm_environment
 	
-	# web virtual machines
-	vm_web_instances = var.vm_web_instances
+    # web virtual machines
+    vm_web_instances = var.vm_web_instances
     vm_web_cpu       = var.vm_web_cpu
     vm_web_memory    = var.vm_web_memory
 	
-	# app virtual machines
-	vm_app_instances = var.vm_app_instances
+    # app virtual machines
+    vm_app_instances = var.vm_app_instances
     vm_app_cpu       = var.vm_app_cpu
     vm_app_memory    = var.vm_app_memory
 	
-	# db virtual machines
-	vm_db_instances       = var.vm_db_instances
+    # db virtual machines
+    vm_db_instances       = var.vm_db_instances
     vm_db_cpu             = var.vm_db_cpu
     vm_db_memory          = var.vm_db_memory
-	vm_db_additionaldisks = jsonencode(var.vm_db_additionaldisks)
+    vm_db_additionaldisks = jsonencode(var.vm_db_additionaldisks)
 	
-	# web nsx load balancer
-	lb_web_port      = var.lb_web_port
+    # web nsx load balancer
+    lb_web_port      = var.lb_web_port
     lb_web_protocol  = var.lb_web_protocol
     lb_web_algorithm = var.lb_web_algorithm
   }
 
   timeouts {
     create = var.timeout_create
-	update = var.timeout_update
+    update = var.timeout_update
     delete = var.timeout_delete
   }
 }
