@@ -1,0 +1,195 @@
+name: layer3 demo
+version: 1
+inputs:
+  vm_environment:
+    type: string
+  vm_web_instances:
+    type: integer
+  vm_web_cpu:
+    type: integer
+  vm_web_memory:
+    type: integer
+  vm_app_instances:
+    type: integer
+  vm_app_cpu:
+    type: integer
+  vm_app_memory:
+    type: integer
+  vm_db_instances:
+    type: integer
+  vm_db_cpu:
+    type: integer
+  vm_db_memory:
+    type: integer
+  vm_db_additionaldisks:
+    type: array
+    items:
+      type: object
+      properties:
+        size:
+          type: integer
+        SCSIController:
+          type: string
+  lb_web_port:
+    type: integer
+  lb_web_protocol:
+    type: string
+  lb_web_algorithm:
+    type: string
+resources:
+  network_web:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:web
+        - tag: network:nsx
+  network_app:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:app
+        - tag: network:nsx
+  network_db:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:db
+        - tag: network:nsx
+  ansible_web:
+    type: Cloud.Ansible
+    dependsOn:
+      - lb_web
+    ignoreChanges: true
+    properties:
+      count: ${input.vm_web_instances}
+      host: ${resource.vm_web.*}
+      groups:
+        - vra_web
+      osType: linux
+      account: Caverna Ansible
+      username: root
+      password: ${secret.caverna-linux}
+      hostVariables:
+        nsxVip: ${resource.lb_web.address}
+        nsxAlgorithm: ${resource.lb_web.routes.algorithm[0]}
+        nsxProtocol: ${resource.lb_web.routes.protocol[0]}
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/install-apache.yml
+  ansible_db:
+    type: Cloud.Ansible
+    ignoreChanges: true
+    properties:
+      count: ${input.vm_db_instances}
+      host: ${resource.vm_db.*}
+      groups:
+        - vra_db
+      osType: linux
+      account: Caverna Ansible
+      username: root
+      password: ${secret.caverna-linux}
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/install-mysql.yml
+  security_web:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:web
+  security_app:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:app
+  security_db:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:db
+  vm_web:
+    type: Cloud.vSphere.Machine
+    dependsOn:
+      - vm_app
+    allocatePerInstance: true
+    properties:
+      name: CAV-P-WEB-
+      image: Ubuntu 22.04
+      cpuCount: ${input.vm_web_cpu}
+      totalMemoryMB: ${input.vm_web_memory}
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:web
+      networks:
+        - network: ${resource.network_web.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_web.id}
+      count: ${input.vm_web_instances}
+  vm_app:
+    type: Cloud.vSphere.Machine
+    dependsOn:
+      - vm_db
+    allocatePerInstance: true
+    properties:
+      name: CAV-P-APP-
+      image: Ubuntu 22.04
+      cpuCount: ${input.vm_app_cpu}
+      totalMemoryMB: ${input.vm_app_memory}
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:app
+      networks:
+        - network: ${resource.network_app.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_app.id}
+      count: ${input.vm_app_instances}
+  vm_db:
+    type: Cloud.vSphere.Machine
+    allocatePerInstance: true
+    properties:
+      name: CAV-P-DB-
+      image: Ubuntu 22.04
+      cpuCount: ${input.vm_db_cpu}
+      totalMemoryMB: ${input.vm_db_memory}
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:db
+      networks:
+        - network: ${resource.network_db.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_db.id}
+      attachedDisks: ${map_to_object(slice(resource.disks_db[*].id, length(input.vm_db_additionaldisks)*count.index, length(input.vm_db_additionaldisks)*(count.index+1)), "source")}
+      count: ${input.vm_db_instances}
+  lb_web:
+    type: Cloud.NSX.LoadBalancer
+    properties:
+      name: CAV-P-WEB-LB-
+      network: ${resource.network_web.id}
+      instances: ${resource.vm_web[*].id}
+      internetFacing: false
+      routes:
+        - instancePort: ${input.lb_web_port}
+          instanceProtocol: ${input.lb_web_protocol}
+          port: ${input.lb_web_port}
+          protocol: ${input.lb_web_protocol}
+          algorithm: ${input.lb_web_algorithm}
+      constraints:
+        - tag: nsx:lb-01
+  disks_db:
+    type: Cloud.vSphere.Disk
+    allocatePerInstance: true
+    properties:
+      capacityGb: '${(count.index < length(input.vm_db_additionaldisks) ? input.vm_db_additionaldisks[count.index].size : input.vm_db_additionaldisks[(count.index % length(input.vm_db_additionaldisks))].size)}'
+      SCSIController: '${(count.index < length(input.vm_db_additionaldisks) ? input.vm_db_additionaldisks[count.index].SCSIController : input.vm_db_additionaldisks[(count.index % length(input.vm_db_additionaldisks))].SCSIController)}'
+      count: ${length(input.vm_db_additionaldisks) * input.vm_db_instances}
