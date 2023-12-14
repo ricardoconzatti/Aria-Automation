@@ -1,0 +1,11 @@
+var host = VraHostManager.defaultHostData;
+var allprojects = VraEntitiesFinder.getProjects(host);
+
+for (var i = 0; i < allprojects.length; i++) { // project looping
+    if (projectId == allprojects[i].id) {
+        //System.log(allprojects[i].name.toLowerCase());
+        var projectName = allprojects[i].name.toLowerCase();
+    }
+}
+
+return projectName;
