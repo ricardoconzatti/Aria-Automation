@@ -1,0 +1,19 @@
+- name: "Install Apache"
+  hosts: all
+  become: yes
+  tasks:
+    - name: "Install latest version of Apache"
+      apt: name=apache2 update_cache=yes state=latest
+
+    - name: "Remove default index.html"
+      ansible.builtin.file:
+        path: /var/www/html/index.html
+        state: absent
+
+    - name: "Configure index.html example page"
+      template:
+        src: index.html.j2
+        dest: /var/www/html/index.html
+
+    - name: "Restart Apache service"
+      service: name=apache2 state=restarted
