@@ -1,0 +1,6 @@
+- name: "Install MySQL"
+  hosts: all
+  become: yes
+  tasks:
+    - name: "Install latest version of MySQL"
+      apt: name=mysql-server update_cache=yes state=latest
