@@ -1,0 +1,31 @@
+- name: "Install Apache and PHP - Homer Web"
+  hosts: all
+  become: yes
+  tasks:
+    - name: "Install latest version of Apache"
+      apt: name=apache2 update_cache=yes state=latest
+
+    - name: "Install latest version of PHP"
+      apt: name=php update_cache=yes state=latest
+
+    - name: "Install latest version of PHP MySQL"
+      apt: name=php-mysql update_cache=yes state=latest
+
+    - name: "Restart Apache service"
+      service: name=apache2 state=restarted
+
+    - name: "Remove index.html file"
+      file:
+        path: "/var/www/html/index.html"
+        state: absent
+
+    - name: "Clone repository"
+      git:
+        repo: "https://github.com/ricardoconzatti/demo.git"
+        dest: "/tmp/homer-web"
+
+    - name: "Copy files to Apache folder"
+      shell: cp -r /tmp/homer-web/homer-web-v2/* /var/www/html/
+
+    - name: "Change connection database file"
+      shell: echo '<?php $dbcon = mysqli_connect("{{ database_ip }}", "homer", "homerJayS123", "homer_db"); ?>' > /var/www/html/cnx.php
