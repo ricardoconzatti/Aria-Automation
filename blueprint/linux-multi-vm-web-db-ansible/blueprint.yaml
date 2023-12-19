@@ -1,0 +1,128 @@
+name: Homer Web
+version: 1.0
+inputs:
+  vm_environment:
+    type: string
+    title: Environment
+    oneOf:
+      - title: Production
+        const: prod
+      - title: Development
+        const: dev
+  vm_web_instances:
+    type: integer
+    title: Web Server Instances
+    default: 2
+resources:
+  network_web:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:web
+        - tag: network:nsx
+  network_db:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:db
+        - tag: network:nsx
+  ansible_web:
+    type: Cloud.Ansible
+    dependsOn:
+      - vm_db
+    ignoreChanges: true
+    properties:
+      count: ${input.vm_web_instances}
+      host: ${resource.vm_web.*}
+      groups:
+        - vra_web
+      osType: linux
+      account: Caverna Ansible
+      username: root
+      password: ${secret.caverna-linux}
+      hostVariables:
+        database_ip: ${resource.vm_db.address}
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/install-homer-web.yml
+  ansible_db:
+    type: Cloud.Ansible
+    ignoreChanges: true
+    properties:
+      host: ${resource.vm_db.*}
+      groups:
+        - vra_db
+      osType: linux
+      account: Caverna Ansible
+      username: root
+      password: ${secret.caverna-linux}
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/install-homer-db.yml
+      hostVariables:
+        database_ip: ${resource.vm_db.address}
+  security_web:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:web
+  security_db:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:db
+  vm_web:
+    type: Cloud.vSphere.Machine
+    dependsOn:
+      - vm_db
+    allocatePerInstance: true
+    properties:
+      name: CAV-P-WEB-
+      image: Ubuntu 22.04
+      cpuCount: 1
+      totalMemoryMB: 1024
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:web
+      networks:
+        - network: ${resource.network_web.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_web.id}
+      count: ${input.vm_web_instances}
+  vm_db:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: CAV-P-DB-
+      image: Ubuntu 22.04
+      cpuCount: 2
+      totalMemoryMB: 2048
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:db
+      networks:
+        - network: ${resource.network_db.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_db.id}
+  lb_web:
+    type: Cloud.NSX.LoadBalancer
+    properties:
+      name: CAV-P-WEB-LB-
+      network: ${resource.network_web.id}
+      instances: ${resource.vm_web[*].id}
+      internetFacing: false
+      routes:
+        - instancePort: 80
+          instanceProtocol: TCP
+          port: 80
+          protocol: TCP
+          algorithm: ROUND_ROBIN
+      constraints:
+        - tag: nsx:lb-01
