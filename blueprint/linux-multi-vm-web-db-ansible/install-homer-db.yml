@@ -1,0 +1,57 @@
+- name: "Install MySQL - Homer Web"
+  hosts: all
+  become: yes
+  tasks:
+    - name: "Install latest version of MySQL"
+      apt:
+        name: mysql-server
+        update_cache: yes
+        state: latest
+
+    - name: "Install PyMySQL"
+      apt:
+        name: python3-pymysql
+        state: present
+
+    - name: "Create a MySQL database"
+      mysql_db:
+        name: homer_db
+        state: present
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Create a table"
+      mysql_query:
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        query: "CREATE TABLE IF NOT EXISTS homer_db.thumbs (code INT AUTO_INCREMENT PRIMARY KEY, status VARCHAR(50), date TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+
+    - name: "Create a MySQL user"
+      mysql_user:
+        name: homer
+        password: homerJayS123
+        priv: '*.*:ALL'
+        host: '%'
+        state: present
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Grant privileges to the user on the database"
+      mysql_user:
+        name: homer
+        priv: 'homer_db.*:ALL'
+        host: '%'
+        state: present
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Update MySQL configuration to allow external connections"
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address\s*='
+        line: 'bind-address = {{ database_ip }}'
+
+    - name: "Restart MySQL service"
+      service:
+        name: mysql
+        state: restarted
