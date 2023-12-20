@@ -1,0 +1,51 @@
+- name: "Install MySQL - WordPress"
+  hosts: all
+  become: yes
+  tasks:
+    - name: "Install latest version of MySQL"
+      apt:
+        name: mysql-server
+        update_cache: yes
+        state: latest
+
+    - name: "Install PyMySQL"
+      apt:
+        name: python3-pymysql
+        state: present
+
+    - name: "Create a MySQL database"
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Create a MySQL user"
+      mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        priv: '*.*:ALL'
+        host: '%'
+        state: present
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Grant privileges to the user on the database"
+      mysql_user:
+        name: "{{ db_user }}"
+        priv: '{{ db_name }}.*:ALL'
+        host: '%'
+        state: present
+        login_host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Update MySQL configuration to allow external connections"
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address\s*='
+        line: 'bind-address = {{ db_host }}'
+
+    - name: "Restart MySQL service"
+      service:
+        name: mysql
+        state: restarted
