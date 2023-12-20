@@ -1,0 +1,134 @@
+name: WordPress
+version: 1
+inputs:
+  vm_environment:
+    type: string
+    title: Environment
+    oneOf:
+      - title: Production
+        const: prod
+      - title: Development
+        const: dev
+  wp_version:
+    type: string
+    title: WordPress version
+    default: latest
+    enum:
+      - latest
+      - 6.4.2
+      - 6.3.2
+      - 6.3.1
+  db_name:
+    type: string
+    title: Database name
+    default: wp_db_001
+  db_user:
+    type: string
+    title: Database username
+    default: wp_conza
+  db_pass:
+    type: string
+    title: Database password
+    encrypted: true
+resources:
+  network_web:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:web
+        - tag: network:nsx
+  network_db:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:db
+        - tag: network:nsx
+  ansible_web:
+    type: Cloud.Ansible
+    dependsOn:
+      - vm_db
+    #ignoreChanges: true
+    properties:
+      host: ${resource.vm_web.*}
+      groups:
+        - vra_web
+      osType: linux
+      account: Caverna Ansible
+      username: root
+      password: ${secret.caverna-linux}
+      hostVariables:
+        wp_version: ${input.wp_version}
+        db_name: ${input.db_name}
+        db_user: ${input.db_user}
+        db_pass: ${input.db_pass}
+        db_host: ${resource.vm_db.address}
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/install-wordpress-web.yml
+  ansible_db:
+    type: Cloud.Ansible
+    #ignoreChanges: true
+    properties:
+      host: ${resource.vm_db.*}
+      groups:
+        - vra_db
+      osType: linux
+      account: Caverna Ansible
+      username: root
+      password: ${secret.caverna-linux}
+      hostVariables:
+        db_name: ${input.db_name}
+        db_user: ${input.db_user}
+        db_pass: ${input.db_pass}
+        db_host: ${resource.vm_db.address}
+      playbooks:
+        provision:
+          - /etc/ansible/playbooks/install-wordpress-db.yml
+  security_web:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:web
+  security_db:
+    type: Cloud.SecurityGroup
+    properties:
+      securityGroupType: existing
+      constraints:
+        - tag: security:db
+  vm_web:
+    type: Cloud.vSphere.Machine
+    dependsOn:
+      - vm_db
+    properties:
+      name: CAV-P-WEB-
+      image: Ubuntu 22.04
+      cpuCount: 1
+      totalMemoryMB: 1024
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:web
+      networks:
+        - network: ${resource.network_web.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_web.id}
+  vm_db:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: CAV-P-DB-
+      image: Ubuntu 22.04
+      cpuCount: 1
+      totalMemoryMB: 1024
+      constraints:
+        - tag: ${'environment:' + (input.vm_environment)}
+        - tag: service:db
+      networks:
+        - network: ${resource.network_db.id}
+          assignment: static
+          securityGroups:
+            - ${resource.security_db.id}
