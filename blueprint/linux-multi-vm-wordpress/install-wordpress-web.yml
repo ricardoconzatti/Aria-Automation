@@ -1,0 +1,64 @@
+- name: "Install Apache and PHP - WordPress"
+  hosts: all
+  become: yes
+  tasks:
+    - name: "Install latest version of Apache"
+      apt: name=apache2 update_cache=yes state=latest
+
+    - name: "Install latest version of PHP"
+      apt: name=php update_cache=yes state=latest
+
+    - name: "Install latest version of PHP MySQL"
+      apt: name=php-mysql update_cache=yes state=latest
+
+    - name: "Restart Apache service"
+      service: name=apache2 state=restarted
+
+    - name: "Download WordPress file"
+      get_url:
+        url: "https://wordpress.org/wordpress-{{ wp_version }}.tar.gz"
+        dest: "/var/www/html/wordpress-{{ wp_version }}.tar.gz"
+
+    - name: "Extract tar.gz"
+      unarchive:
+        src: "/var/www/html/wordpress-{{ wp_version }}.tar.gz"
+        dest: "/var/www/html/"
+        remote_src: yes
+        extra_opts: --strip-components=1
+
+    - name: "Configure DB Name - wp-config file"
+      lineinfile:
+        path: /var/www/html/wp-config-sample.php
+        regexp: "^(define\\(\\s*'DB_NAME',\\s*')([^']+)('.*)$"
+        line: "define( 'DB_NAME', '{{ db_name }}' );"
+
+    - name: "Configure DB USER - wp-config file"
+      lineinfile:
+        path: /var/www/html/wp-config-sample.php
+        regexp: "^(define\\(\\s*'DB_USER',\\s*')([^']+)('.*)$"
+        line: "define( 'DB_USER', '{{ db_user }}' );"
+
+    - name: "Configure DB PASSWORD - wp-config file"
+      lineinfile:
+        path: /var/www/html/wp-config-sample.php
+        regexp: "^(define\\(\\s*'DB_PASSWORD',\\s*')([^']+)('.*)$"
+        line: "define( 'DB_PASSWORD', '{{ db_pass }}' );"
+
+    - name: "Configure DB HOSTNAME - wp-config file"
+      lineinfile:
+        path: /var/www/html/wp-config-sample.php
+        regexp: "^(define\\(\\s*'DB_HOST',\\s*')([^']+)('.*)$"
+        line: "define( 'DB_HOST', '{{ db_host }}' );"
+
+    - name: "Rename WordPress config file"
+      shell: mv /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+
+    - name: "Clean - index.html"
+      file:
+        path: "/var/www/html/index.html"
+        state: absent
+
+    - name: "Clean - wordpress tar.gz"
+      file:
+        path: "/var/www/html/wordpress-{{ wp_version }}.tar.gz"
+        state: absent
